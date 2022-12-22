@@ -10,109 +10,130 @@ from tkinter import filedialog
 from eyed3 import load as eyed3_load
 
 
-def live_run(*cmd):
+def live_stdout_run(*cmd):
 
-    print()
     process = Popen(cmd, stdout=PIPE, shell=True)
     for c in iter(lambda: process.stdout.read(1), b""):
         stdout.buffer.write(c)
     process.wait()
-    print()
 
     return process
 
 
-def main():
+class Downloader:
 
-    tk = Tk()
-    tk.attributes("-topmost", True)
-    tk.withdraw()
+    def __init__(self):
 
-    url = input(">>> YouTube Video URL: ")
-    file_type = input(">>> File Type (mp3/mp4): ")
-    temp_file = f"ytdl-temp.{file_type}"
+        self.tk = Tk()
+        self.tk.attributes("-topmost", True)
+        self.tk.withdraw()
 
-    if file_type == "mp3":
+        self.url = ""
+        self.file_type = ""
+        self.temp_file = ""
 
-        res = live_run("ytdlp", url, "-o", temp_file, "-x", "--audio-format", "mp3")
+    def main(self):
 
-        if res.returncode != 0:
+        self.url = input(">>> YouTube Video URL: ")
+        self.file_type = input(">>> File Type (mp3/mp4): ")
+        self.temp_file = f"ytdl-temp.{self.file_type}"
+
+        match self.file_type:
+            case "mp3":
+                self.download_mp3()
+            case "mp4":
+                self.download_mp4()
+            case _:
+                print("(!) Invalid file type")
+
+    def save_file(self, initial_name):
+
+        fp = filedialog.asksaveasfilename(filetypes=[(self.file_type, f"*.{self.file_type}")],
+                                          initialfile=initial_name)
+
+        if fp == "":
+            remove(self.temp_file)
+            print("(!) Cancelled")
+        elif fp.endswith(f".{self.file_type}"):
+            replace(self.temp_file, fp)
+            print("(*) Completed")
+        else:
+            replace(self.temp_file, f"{fp}.{self.file_type}")
+            print("(*) Completed")
+
+    def download_mp3(self):
+
+        console_res = live_stdout_run("ytdlp", self.url, "-o", self.temp_file, "-x", "--audio-format", "mp3")
+
+        if console_res.returncode != 0:
             return
 
         name = input(">>> Music Title: ")
         album = input(">>> Music Album: ")
         artist = input(">>> Music Artist: ")
 
-        metadata = eyed3_load(temp_file)
+        metadata = eyed3_load(self.temp_file)
         metadata.tag.title = name
         metadata.tag.album = album
         metadata.tag.artist = artist
         metadata.tag.save()
 
-        metadata.tag.images.set()
+        self.save_file(name)
 
-        fp = filedialog.asksaveasfilename(filetypes=[(file_type, f"*.{file_type}")],
-                                          initialfile=name) + f".{file_type}"
-        if fp != ".mp3":
-            replace(temp_file, fp)
-            print("(*) Completed")
-        else:
-            remove(temp_file)
-            print("(*) Cancelled")
-
-    elif file_type == "mp4":
+    def download_mp4(self):
 
         quality = input(">>> Video Quality (720/1080): ")
-        if quality not in ("720", "1080"):
-            print("(!) Invalid quality")
+        match quality:
+            case "720":
+                self.download_mp4_720()
+            case "1080":
+                self.download_mp4_1080()
+            case _:
+                print("(!) Invalid quality")
 
-        if quality == "720":
+    def download_mp4_720(self):
 
-            res = live_run("ytdlp", url, "-o", f"ytdl-temp.{file_type}", "-f", "mp4")
-            if res.returncode != 0:
-                return
+        res = live_stdout_run("ytdlp", self.url, "-o", f"ytdl-temp.{self.file_type}", "-f", "mp4")
+        if res.returncode != 0:
+            return
 
-        elif quality == "1080":
+        self.save_file("download")
 
-            res = run(("ytdlp", "-F", url), capture_output=True, shell=True)
-            if res.returncode != 0:
-                print("(!) " + res.stderr.decode("utf-8")[7:-1])
-                return
+    def download_mp4_1080(self):
 
-            m4a_format = "-1"
-            hd_mp4_format = "-1"
-            for line in (line[:32].split() for line in res.stdout.decode("utf-8").split("\n")):
-                if len(line) > 2:
-                    if line[1] == "m4a" and line[2] == "audio":
-                        m4a_format = line[0]
-                    elif line[1] == "mp4" and line[2] == "1920x1080":
-                        hd_mp4_format = line[0]
+        res = run(("ytdlp", "-F", self.url), capture_output=True, shell=True)
+        if res.returncode != 0:
+            print("(!) " + res.stderr.decode("utf-8")[7:-1])
+            return
 
-            if m4a_format == "-1":
-                print("(!) No m4a found.")
-                return
-            if hd_mp4_format == "-1":
-                print("(!) No 1920x1080 mp4 found.")
-                return
+        m4a_format = "-1"
+        hd_mp4_format = "-1"
+        for line in (line[:32].split() for line in res.stdout.decode("utf-8").split("\n")):
+            if len(line) > 2:
+                if line[1] == "m4a" and line[2] == "audio":
+                    m4a_format = line[0]
+                elif line[1] == "mp4" and line[2] == "1920x1080":
+                    hd_mp4_format = line[0]
 
-            res = live_run("ytdlp", url, "-o", f"ytdl-temp.{file_type}", "-f", f"{m4a_format}+{hd_mp4_format}")
-            if res.returncode != 0:
-                return
+        if m4a_format == "-1":
+            print("(!) No m4a found. Try downloading manually.")
+            return
+        if hd_mp4_format == "-1":
+            print("(!) No 1920x1080 mp4 found. Try downloading manually.")
+            return
 
-        fp = filedialog.asksaveasfilename(filetypes=[(file_type, f"*.{file_type}")],
-                                          initialfile="download") + f".{file_type}"
-        if fp != ".mp4":
-            replace(temp_file, fp)
-            print("(*) Completed")
-        else:
-            remove(temp_file)
-            print("(*) Cancelled")
+        console_res = live_stdout_run("ytdlp", self.url, "-o", f"ytdl-temp.{self.file_type}", "-f",
+                                      f"{m4a_format}+{hd_mp4_format}")
 
-    else:
-        print("(!) Invalid file type")
+        if console_res.returncode != 0:
+            return
+
+        self.save_file("download")
 
 
 if __name__ == '__main__':
+
+    downloader = Downloader()
     while True:
-        main()
+        downloader.main()
         print()
