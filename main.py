@@ -48,7 +48,7 @@ class Downloader:
 
     def save_file(self, initial_name):
 
-        fp = filedialog.asksaveasfilename(filetypes=[(self.file_type, f"*.{self.file_type}")],
+        fp = filedialog.asksaveasfilename(filetypes=[(self.file_type.upper(), f"*.{self.file_type}")],
                                           initialfile=initial_name)
 
         if fp == "":
@@ -72,10 +72,24 @@ class Downloader:
         album = input(">>> Music Album: ")
         artist = input(">>> Music Artist: ")
 
+        print(">>> Cover Image: ", end="")
+        cover = filedialog.askopenfilename(filetypes=[("PNG", ".png"), ("JPG", ".jpg"), ("JPEG", ".jpeg")],
+                                           title="Open cover image")
+        if cover == "":
+            print("None selected")
+        else:
+            print(cover)
+
         metadata = eyed3_load(self.temp_file)
+        metadata.initTag(version=(2, 3, 0))
         metadata.tag.title = name
         metadata.tag.album = album
         metadata.tag.artist = artist
+
+        if cover != "":
+            with open(cover, "rb") as cover_file:
+                metadata.tag.images.set(3, cover_file.read(), "image/jpeg", u"Cover")
+
         metadata.tag.save()
 
         self.save_file(name)
