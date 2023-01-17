@@ -7,6 +7,7 @@
   ![](https://img.shields.io/github/license/wusteven815/youtube-downloader)
   ![](https://img.shields.io/github/v/release/wusteven815/youtube-downloader)
   ![](https://img.shields.io/github/last-commit/wusteven815/youtube-downloader)
+  ![](https://img.shields.io/badge/yt--dlp-2022.11.11-red)
 
 </div>
 
